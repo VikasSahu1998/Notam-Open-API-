@@ -3,8 +3,8 @@ from notam_entry import extract_notam_entries
 # Define the API endpoint and API key
 api_endpoint = "https://applications.icao.int/dataservices/api/notams-realtime-list"
 # api_key = "0e933f98-5067-4062-bab7-059b4ec17605"
-# api_key = "a497e5c5-271c-443e-982e-99211f2cddb4"
-api_key = "32f59443-8ae8-4f2d-a6bf-80679c876091"
+api_key = "a497e5c5-271c-443e-982e-99211f2cddb4"
+# api_key = "32f59443-8ae8-4f2d-a6bf-80679c876091"
 # api_endpoint = "https://dummyjson.com/c/9609-4fc7-44f1-bac0"
 # api_key = "fb145f7c-3e3e-418d-b20a-9d84d190c8f5"
 # List of ICAO codes

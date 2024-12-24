@@ -2,6 +2,7 @@ from itertools import zip_longest
 from model import NotamEntry, session
 import re
 import PyPDF2
+from sqlalchemy import and_
 
 
 from datetime import datetime
@@ -267,67 +268,80 @@ def extract_notam_entries(text):
     if len(notam_number_data) != len(first_part_list):
      print(f"Mismatch: notam_number_data has {len(notam_number_data)} items, first_part_list has {len(first_part_list)} items.")
     # print("First Part List:", first_part_list)
+    # Iterate through the data using zip_longest
     for notam_number_datas, part, a_b_datas, b_c_datas, c_d_datas, e_f_datas, g_datas, f_g_datas, text_description, created, source, text in zip_longest(
         notam_number_data, first_part_list, a_b_data, b_c_data, c_d_data, e_f_data, g_data, fg_data, text_data, createddata, sourcedata, notam_data, fillvalue=default_value):
-    
+
     # Skip iteration if all data fields are None or empty
-     if all(value in (None, '', []) for value in [notam_number_datas, part, a_b_datas, b_c_datas, c_d_datas, e_f_datas, g_datas, f_g_datas, text_description, created, source, text]):
-        continue
+        if all(value in (None, '', []) for value in [notam_number_datas, part, a_b_datas, b_c_datas, c_d_datas, e_f_datas, g_datas, f_g_datas, text_description, created, source, text]):
+            continue
 
     # Safely handle notam_number_datas and part
-     series = notam_number_datas[0] if notam_number_datas and len(notam_number_datas) > 0 else ''
-     number = notam_number_datas[1] if notam_number_datas and len(notam_number_datas) > 1 else ''
-     notam_type = notam_number_datas[2] if notam_number_datas and len(notam_number_datas) > 2 else ''
-     additional_info = notam_number_datas[3] if notam_number_datas and len(notam_number_datas) > 3 else ''
-     fir = part[0] if part and len(part) > 0 else ''
-     qualifier = part[1][0] if part and len(part) > 1 and len(part[1]) > 0 else ''
-     qualifier1 = part[1][1:3] if part and len(part[1]) > 2 else ''
-     qualifier2 = part[1][3:5] if part and len(part[1]) > 4 else ''
-     traffic = part[2] if part and len(part) > 2 else ''
-     purpose = part[3] if part and len(part) > 3 else ''
-     scope = part[4] if part and len(part) > 4 else ''
-     from_fl = part[5] if part and len(part) > 5 else None
-     upto_fl = part[6] if part and len(part) > 6 else None
-     center_lat = part[7] if part and len(part) > 7 else None
-     center_lon = part[8] if part and len(part) > 8 else None
-     radius_of_area_affected = part[9] if part and len(part) > 9 else None
+        series = notam_number_datas[0] if notam_number_datas and len(notam_number_datas) > 0 else ''
+        number = notam_number_datas[1] if notam_number_datas and len(notam_number_datas) > 1 else ''
+        notam_type = notam_number_datas[2] if notam_number_datas and len(notam_number_datas) > 2 else ''
+        additional_info = notam_number_datas[3] if notam_number_datas and len(notam_number_datas) > 3 else ''
+        fir = part[0] if part and len(part) > 0 else ''
+        qualifier = part[1][0] if part and len(part) > 1 and len(part[1]) > 0 else ''
+        qualifier1 = part[1][1:3] if part and len(part[1]) > 2 else ''
+        qualifier2 = part[1][3:5] if part and len(part[1]) > 4 else ''
+        traffic = part[2] if part and len(part) > 2 else ''
+        purpose = part[3] if part and len(part) > 3 else ''
+        scope = part[4] if part and len(part) > 4 else ''
+        from_fl = part[5] if part and len(part) > 5 else None
+        upto_fl = part[6] if part and len(part) > 6 else None
+        center_lat = part[7] if part and len(part) > 7 else None
+        center_lon = part[8] if part and len(part) > 8 else None
+        radius_of_area_affected = part[9] if part and len(part) > 9 else None
 
-    # Create the NotamEntry object
-     notam_entry = NotamEntry(
-        series=series,
-        number=number,
-        type=notam_type,
-        additional_info=additional_info,
-        fir=fir,
-        qualifier=qualifier,
-        qualifier1=qualifier1,
-        qualifier2=qualifier2,
-        traffic=traffic,
-        purpose=purpose,
-        scope=scope,
-        from_fl=from_fl,
-        upto_fl=upto_fl,
-        center_lat=center_lat,
-        center_lon=center_lon,
-        radius_of_area_affected=radius_of_area_affected,
-        airport_fir=a_b_datas[0] if a_b_datas and len(a_b_datas) > 0 else '',
-        start_date=b_c_datas if b_c_datas else '',
-        end_date=c_d_datas if c_d_datas else '',
-        day_time=e_f_datas if e_f_datas else '',
-        upper_limit=g_datas if g_datas else '',
-        lower_limit=f_g_datas if f_g_datas else '',
-        text_description=text_description,
-        created_on=datetime.now(),
-        source=source,
-        notam=text
-    )
+        # Check for duplicates in the database
+        existing_notam = session.query(NotamEntry).filter(
+            and_(
+                NotamEntry.series == series,
+                NotamEntry.number == number,
+                NotamEntry.type == notam_type
+            )
+        ).first()
 
-     all_notam_entries.append(notam_entry)
+        if existing_notam:
+            continue  # Skip this entry if it already exists in the database
 
-# Add all entries to the session and commit after the loop
+        # Create the NotamEntry object
+        notam_entry = NotamEntry(
+            series=series,
+            number=number,
+            type=notam_type,
+            additional_info=additional_info,
+            fir=fir,
+            qualifier=qualifier,
+            qualifier1=qualifier1,
+            qualifier2=qualifier2,
+            traffic=traffic,
+            purpose=purpose,
+            scope=scope,
+            from_fl=from_fl,
+            upto_fl=upto_fl,
+            center_lat=center_lat,
+            center_lon=center_lon,
+            radius_of_area_affected=radius_of_area_affected,
+            airport_fir=a_b_datas[0] if a_b_datas and len(a_b_datas) > 0 else '',
+            start_date=b_c_datas if b_c_datas else '',
+            end_date=c_d_datas if c_d_datas else '',
+            day_time=e_f_datas if e_f_datas else '',
+            upper_limit=g_datas if g_datas else '',
+            lower_limit=f_g_datas if f_g_datas else '',
+            text_description=text_description,
+            created_on=datetime.now(),
+            source=source,
+            notam=text
+        )
+
+        all_notam_entries.append(notam_entry)
+
+    # Add all entries to the session and commit after the loop
     if all_notam_entries:  # Only commit if there are entries to add
-     session.add_all(all_notam_entries)
-     session.commit()
+        session.add_all(all_notam_entries)
+        session.commit()
 
   
 
